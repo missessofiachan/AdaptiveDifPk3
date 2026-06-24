@@ -16,8 +16,13 @@ server int adaptive_respawn_floor_pct = 40;
 // Dynamic Spawn Multiplier System
 server bool adaptive_allow_extra_spawns = true;
 server float adaptive_spawn_chance_mult = 25.0; 
+server bool adaptive_spawn_realtime = true;     
 server bool adaptive_ammo_protection = true;   
 server bool adaptive_aggression_chains = true; 
+
+// Advanced Combat & AI Drivers
+server bool adaptive_nightmare_flags = true;    
+server bool adaptive_infight_mitigation = true; 
 
 // HUD Layout Positioning Settings
 user bool adaptive_hud_show = true;

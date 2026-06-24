@@ -49,6 +49,7 @@ class AdaptiveDifficultyHandler : StaticEventHandler
         CVar chanceCv = CVar.FindCVar('adaptive_spawn_chance_mult');
         CVar minCv = CVar.FindCVar('adaptive_min_difficulty');
         CVar maxCv = CVar.FindCVar('adaptive_max_difficulty');
+        CVar realTimeCv = CVar.FindCVar('adaptive_spawn_realtime');
 
         switch (selection)
         {
@@ -57,6 +58,7 @@ class AdaptiveDifficultyHandler : StaticEventHandler
                 if (extraCv) extraCv.SetBool(false);
                 if (minCv) minCv.SetFloat(0.3);
                 if (maxCv) maxCv.SetFloat(0.6);
+                if (realTimeCv) realTimeCv.SetBool(false);
                 currentDifficulty = 0.5;
                 break;
             case 1: 
@@ -64,6 +66,7 @@ class AdaptiveDifficultyHandler : StaticEventHandler
                 if (extraCv) extraCv.SetBool(false);
                 if (minCv) minCv.SetFloat(0.5);
                 if (maxCv) maxCv.SetFloat(0.9);
+                if (realTimeCv) realTimeCv.SetBool(false);
                 currentDifficulty = 0.8;
                 break;
             case 2: 
@@ -71,6 +74,7 @@ class AdaptiveDifficultyHandler : StaticEventHandler
                 if (extraCv) extraCv.SetBool(false);
                 if (minCv) minCv.SetFloat(0.8);
                 if (maxCv) maxCv.SetFloat(1.2);
+                if (realTimeCv) realTimeCv.SetBool(false);
                 currentDifficulty = 1.0;
                 break;
             case 3: 
@@ -79,21 +83,24 @@ class AdaptiveDifficultyHandler : StaticEventHandler
                 if (chanceCv) chanceCv.SetFloat(25.0);
                 if (minCv) minCv.SetFloat(1.0);
                 if (maxCv) maxCv.SetFloat(1.5);
+                if (realTimeCv) realTimeCv.SetBool(true);
                 currentDifficulty = 1.3;
                 break;
             case 4: 
                 if (respawnCv) respawnCv.SetBool(true);
                 if (extraCv) extraCv.SetBool(true);
-                if (chanceCv) chanceCv.SetFloat(100.0); // 1x Full Clone
+                if (chanceCv) chanceCv.SetFloat(100.0);
                 if (minCv) minCv.SetFloat(1.0);
                 if (maxCv) maxCv.SetFloat(2.0); 
+                if (realTimeCv) realTimeCv.SetBool(true);
                 break;
             case 5: 
                 if (respawnCv) respawnCv.SetBool(true);
                 if (extraCv) extraCv.SetBool(true);
-                if (chanceCv) chanceCv.SetFloat(300.0); // 3x Full Clones Baseline
+                if (chanceCv) chanceCv.SetFloat(300.0);
                 if (minCv) minCv.SetFloat(2.0);
                 if (maxCv) maxCv.SetFloat(2.0);
+                if (realTimeCv) realTimeCv.SetBool(false);
                 currentDifficulty = 2.0;
                 break;
         }
@@ -162,6 +169,13 @@ class AdaptiveDifficultyHandler : StaticEventHandler
         if (speedMultCv && speedMultCv.GetBool()) 
             mon.speed = mon.default.speed * (0.5 + (currentDifficulty * 0.5));
 
+        CVar nmFlagsCv = CVar.FindCVar('adaptive_nightmare_flags');
+        if (nmFlagsCv && nmFlagsCv.GetBool())
+        {
+            if (currentDifficulty >= 1.4) mon.bMISSILEMORE = true;
+            if (currentDifficulty >= 1.9) mon.bALWAYSFAST = true;
+        }
+
         CVar extraSpawnsCv = CVar.FindCVar('adaptive_allow_extra_spawns');
         if (extraSpawnsCv && extraSpawnsCv.GetBool())
         {
@@ -172,7 +186,13 @@ class AdaptiveDifficultyHandler : StaticEventHandler
             
             CVar chanceCv = CVar.FindCVar('adaptive_spawn_chance_mult');
             double baseChance = chanceCv ? chanceCv.GetFloat() : 25.0;
-            double scaledProbability = baseChance * (currentDifficulty / 1.0);
+            
+            double scaledProbability = baseChance;
+            CVar realTimeCv = CVar.FindCVar('adaptive_spawn_realtime');
+            if (realTimeCv && realTimeCv.GetBool())
+            {
+                scaledProbability = baseChance * currentDifficulty;
+            }
             
             CVar aggChainsCv = CVar.FindCVar('adaptive_aggression_chains');
             if (aggChainsCv && aggChainsCv.GetBool() && killChainCounter >= 8) 
@@ -180,23 +200,14 @@ class AdaptiveDifficultyHandler : StaticEventHandler
                 scaledProbability *= 1.5;
             }
 
-            // --- 10x SPAWN SCALING MATH ---
-            // Divide out the whole hundreds to get guaranteed clone amounts
             int clonesToSpawn = int(scaledProbability / 100.0);
             double remainderChance = scaledProbability % 100.0;
             
-            // Roll the remaining percentage for a chance at +1 extra
-            if (FRandom[AdaptiveSpawnGen](0.0, 100.0) <= remainderChance)
-            {
-                clonesToSpawn++;
-            }
-            
-            // Engine hard-cap safety limit to prevent instant memory crash (Capped at 20x per individual monster)
+            if (FRandom[AdaptiveSpawnGen](0.0, 100.0) <= remainderChance) clonesToSpawn++;
             clonesToSpawn = Min(clonesToSpawn, 20);
 
             for (int i = 0; i < clonesToSpawn; i++)
             {
-                // Increase the spread offset slightly so massive hordes don't telefrag each other instantly
                 Vector3 spawnPos = mon.pos + (FRandom[AdaptiveOffset](-48, 48), FRandom[AdaptiveOffset](-48, 48), 0);
                 Actor clone = Actor.Spawn(mon.GetClass(), spawnPos);
                 if (clone)
@@ -204,6 +215,21 @@ class AdaptiveDifficultyHandler : StaticEventHandler
                     clone.GiveInventory("AdaptiveSpawnToken", 1);
                     clone.bAMBUSH = mon.bAMBUSH;
                 }
+            }
+        }
+    }
+
+    override void WorldThingDamaged(WorldEvent e)
+    {
+        if (!e.Thing || !e.DamageSource || e.Thing.health <= 0) return;
+
+        CVar infightCv = CVar.FindCVar('adaptive_infight_mitigation');
+        if (infightCv && infightCv.GetBool() && currentDifficulty >= 1.4)
+        {
+            if (e.Thing.bISMONSTER && e.DamageSource.bISMONSTER && e.Thing != e.DamageSource)
+            {
+                int mitigationHeal = int(e.Damage * 0.5);
+                e.Thing.health += mitigationHeal;
             }
         }
     }
