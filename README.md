@@ -12,6 +12,8 @@
 
 ---
 
+![GZDoom Compatible](https://img.shields.io/badge/GZDoom-v4.10%2B-blue)
+
 ## 🤝 The Perfect Pairing: HP Regeneration
 This mod is designed to pair perfectly with **[HP Regen UZ](https://github.com/missessofiachan/hp-regenUZpk3)**.
 
