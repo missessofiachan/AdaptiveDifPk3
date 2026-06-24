@@ -20,6 +20,13 @@ class AdaptiveDifficultyHandler : StaticEventHandler
 
     Array<DynamicRespawnItem> respawnQueue;
 
+    // FIX: 'clearscope' allows both Play (world) and UI (HUD) to read this toggle safely.
+    clearscope bool IsEngineActive()
+    {
+        CVar enableCv = CVar.FindCVar('adaptive_engine_enabled');
+        return (enableCv && enableCv.GetBool());
+    }
+
     override void OnRegister()
     {
         currentDifficulty = 1.0;
@@ -35,7 +42,10 @@ class AdaptiveDifficultyHandler : StaticEventHandler
         respawnQueue.Clear();
         ApplyPresetValues();
         killChainCounter = 0;
-        Console.Printf("\c[Gold]Adaptive Engine Active: Current Session Rating is [ %.2f ]", currentDifficulty);
+        if (IsEngineActive())
+        {
+            Console.Printf("\c[Gold]Adaptive Engine Active: Current Session Rating is [ %.2f ]", currentDifficulty);
+        }
     }
 
     void ApplyPresetValues()
@@ -44,13 +54,15 @@ class AdaptiveDifficultyHandler : StaticEventHandler
         int selection = presetCv ? presetCv.GetInt() : 3;
         lastObservedPreset = selection;
 
+        if (selection == 6) return;
+
         CVar respawnCv = CVar.FindCVar('adaptive_allow_respawn');
         CVar extraCv = CVar.FindCVar('adaptive_allow_extra_spawns');
         CVar chanceCv = CVar.FindCVar('adaptive_spawn_chance_mult');
         CVar minCv = CVar.FindCVar('adaptive_min_difficulty');
         CVar maxCv = CVar.FindCVar('adaptive_max_difficulty');
         CVar realTimeCv = CVar.FindCVar('adaptive_spawn_realtime');
-
+        
         switch (selection)
         {
             case 0: 
@@ -108,21 +120,29 @@ class AdaptiveDifficultyHandler : StaticEventHandler
 
     override void WorldTick()
     {
-        if (level.time < 5 || !playeringame[consoleplayer]) return; 
-        
+        if (!IsEngineActive()) return; 
+        if (level.time < 5 || !playeringame[consoleplayer]) return;
         PlayerInfo p = players[consoleplayer];
         if (!p || !p.mo) return;
 
         CVar presetCv = CVar.FindCVar('adaptive_active_preset');
         if (presetCv && presetCv.GetInt() != lastObservedPreset) ApplyPresetValues();
-
+        
         if (level.time % 35 == 0)
         {
-            int shells = p.mo.CountInv("Shell");
-            int rockets = p.mo.CountInv("RocketAmmo");
-            int cells = p.mo.CountInv("Cell");
-            isAmmoStarved = (shells < 8 && rockets == 0 && cells < 20);
-
+            int maxTotalAmmo = 0;
+            int currentTotalAmmo = 0;
+            for (Inventory item = p.mo.Inv; item != null; item = item.Inv)
+            {
+                let ammoItem = Ammo(item);
+                if (ammoItem)
+                {
+                    currentTotalAmmo += ammoItem.Amount;
+                    maxTotalAmmo += ammoItem.MaxAmount;
+                }
+            }
+            isAmmoStarved = (maxTotalAmmo > 0 && (double(currentTotalAmmo) / double(maxTotalAmmo)) < 0.15);
+            
             if (killChainCounter > 0) killChainCounter--;
 
             CVar maxCv = CVar.FindCVar('adaptive_max_difficulty');
@@ -133,11 +153,14 @@ class AdaptiveDifficultyHandler : StaticEventHandler
             if (minDiff != maxDiff)
             {
                 double diffDelta = 0.0;
-                int totalHealthPool = p.mo.health + p.mo.countinv("Armor");
+                
+                let basicArmor = BasicArmor(p.mo.FindInventory("BasicArmor"));
+                int armorAmount = basicArmor ? basicArmor.Amount : 0;
+                int totalHealthPool = p.mo.health + armorAmount;
                 
                 CVar aggressiveCv = CVar.FindCVar('adaptive_aggressive_tracking');
                 double scaleFactor = (aggressiveCv && aggressiveCv.GetBool()) ? 2.0 : 1.0;
-
+                
                 CVar rampCv = CVar.FindCVar('adaptive_ramp_up_speed');
                 CVar coolCv = CVar.FindCVar('adaptive_cool_down_speed');
                 double rampUp = rampCv ? rampCv.GetFloat() : 0.03;
@@ -146,7 +169,7 @@ class AdaptiveDifficultyHandler : StaticEventHandler
                 if (totalHealthPool > 160)      diffDelta = rampUp * 1.5 * scaleFactor;
                 else if (p.mo.health >= 80)     diffDelta = rampUp * scaleFactor;
                 else if (p.mo.health < 35)      diffDelta = -coolDown * scaleFactor;
-
+                
                 currentDifficulty = Clamp(currentDifficulty + diffDelta, minDiff, maxDiff);
             }
         }
@@ -157,6 +180,19 @@ class AdaptiveDifficultyHandler : StaticEventHandler
 
     override void WorldThingSpawned(WorldEvent e)
     {
+        if (!IsEngineActive()) return; 
+
+        if (e.Thing && e.Thing.bMISSILE && !e.Thing.bISMONSTER)
+        {
+            CVar projCv = CVar.FindCVar('adaptive_ai_projectiles');
+            if (projCv && projCv.GetBool() && currentDifficulty > 1.2 && e.Thing.target && e.Thing.target.bISMONSTER && !e.Thing.target.player)
+            {
+                e.Thing.Speed = e.Thing.default.Speed * currentDifficulty;
+                e.Thing.Vel *= currentDifficulty; 
+            }
+            return;
+        }
+
         let mon = Actor(e.Thing);
         if (!mon || !mon.bISMONSTER || mon.player || mon.health <= 0) return;
         if (mon.FindInventory("AdaptiveSpawnToken")) return;
@@ -164,16 +200,28 @@ class AdaptiveDifficultyHandler : StaticEventHandler
         CVar healthMultCv = CVar.FindCVar('adaptive_health_mult');
         if (healthMultCv && healthMultCv.GetBool()) 
             mon.health = int(mon.default.health * currentDifficulty);
-
+            
         CVar speedMultCv = CVar.FindCVar('adaptive_speed_mult');
         if (speedMultCv && speedMultCv.GetBool()) 
             mon.speed = mon.default.speed * (0.5 + (currentDifficulty * 0.5));
-
+            
         CVar nmFlagsCv = CVar.FindCVar('adaptive_nightmare_flags');
         if (nmFlagsCv && nmFlagsCv.GetBool())
         {
             if (currentDifficulty >= 1.4) mon.bMISSILEMORE = true;
             if (currentDifficulty >= 1.9) mon.bALWAYSFAST = true;
+        }
+
+        CVar painResistCv = CVar.FindCVar('adaptive_ai_pain_resist');
+        if (painResistCv && painResistCv.GetBool() && currentDifficulty > 1.0)
+        {
+            mon.PainChance = Max(0, int(mon.default.PainChance * (2.0 - currentDifficulty)));
+        }
+
+        CVar reflexesCv = CVar.FindCVar('adaptive_ai_reflexes');
+        if (reflexesCv && reflexesCv.GetBool() && currentDifficulty >= 1.4)
+        {
+            mon.ReactionTime = Max(0, int(mon.default.ReactionTime / currentDifficulty));
         }
 
         CVar extraSpawnsCv = CVar.FindCVar('adaptive_allow_extra_spawns');
@@ -204,16 +252,24 @@ class AdaptiveDifficultyHandler : StaticEventHandler
             double remainderChance = scaledProbability % 100.0;
             
             if (FRandom[AdaptiveSpawnGen](0.0, 100.0) <= remainderChance) clonesToSpawn++;
-            clonesToSpawn = Min(clonesToSpawn, 20);
-
+            clonesToSpawn = Min(clonesToSpawn, 50); 
+            
             for (int i = 0; i < clonesToSpawn; i++)
             {
-                Vector3 spawnPos = mon.pos + (FRandom[AdaptiveOffset](-48, 48), FRandom[AdaptiveOffset](-48, 48), 0);
-                Actor clone = Actor.Spawn(mon.GetClass(), spawnPos);
+                Vector3 spawnPos = mon.pos + (FRandom[AdaptiveOffset](-64, 64), FRandom[AdaptiveOffset](-64, 64), 0);
+                Actor clone = Actor.Spawn(mon.GetClass(), spawnPos, ALLOW_REPLACE);
+                
                 if (clone)
                 {
-                    clone.GiveInventory("AdaptiveSpawnToken", 1);
-                    clone.bAMBUSH = mon.bAMBUSH;
+                    if (!clone.TestMobjLocation()) 
+                    {
+                        clone.Destroy();
+                    }
+                    else
+                    {
+                        clone.GiveInventory("AdaptiveSpawnToken", 1);
+                        clone.bAMBUSH = mon.bAMBUSH;
+                    }
                 }
             }
         }
@@ -221,8 +277,9 @@ class AdaptiveDifficultyHandler : StaticEventHandler
 
     override void WorldThingDamaged(WorldEvent e)
     {
+        if (!IsEngineActive()) return; 
         if (!e.Thing || !e.DamageSource || e.Thing.health <= 0) return;
-
+        
         CVar infightCv = CVar.FindCVar('adaptive_infight_mitigation');
         if (infightCv && infightCv.GetBool() && currentDifficulty >= 1.4)
         {
@@ -236,11 +293,27 @@ class AdaptiveDifficultyHandler : StaticEventHandler
 
     override void WorldThingDied(WorldEvent e)
     {
+        if (!IsEngineActive()) return; 
         let mon = Actor(e.Thing);
         if (mon && mon.bISMONSTER && !mon.player)
         {
             totalMonstersKilledThisSession++;
             killChainCounter = Min(killChainCounter + 2, 20);
+
+            CVar enrageCv = CVar.FindCVar('adaptive_enrage_swarm');
+            if (enrageCv && enrageCv.GetBool() && currentDifficulty >= 1.5)
+            {
+                BlockThingsIterator it = BlockThingsIterator.Create(mon, 512.0);
+                while (it.Next())
+                {
+                    Actor ally = it.thing;
+                    if (ally && ally.bISMONSTER && ally.health > 0 && ally != mon && !ally.player)
+                    {
+                        ally.bALWAYSFAST = true;
+                        ally.Speed = ally.default.Speed * 1.5;
+                    }
+                }
+            }
 
             CVar allowRespawnCv = CVar.FindCVar('adaptive_allow_respawn');
             if (allowRespawnCv && allowRespawnCv.GetBool())
@@ -261,10 +334,11 @@ class AdaptiveDifficultyHandler : StaticEventHandler
 
     void ProcessRespawnQueue(int playerHealth)
     {
+        if (!IsEngineActive()) return;
         CVar floorCv = CVar.FindCVar('adaptive_respawn_floor_pct');
         int floorPct = floorCv ? floorCv.GetInt() : 40;
         if (playerHealth < floorPct) return;
-
+        
         for (int i = respawnQueue.Size() - 1; i >= 0; i--)
         {
             if (respawnQueue[i] == null)
@@ -279,8 +353,15 @@ class AdaptiveDifficultyHandler : StaticEventHandler
                 Actor spawnedMon = Actor.Spawn(respawnQueue[i].className, respawnQueue[i].spawnPos, ALLOW_REPLACE);
                 if (spawnedMon) 
                 {
-                    spawnedMon.A_SpawnItemEx("TeleportFog");
-                    spawnedMon.GiveInventory("AdaptiveSpawnToken", 1);
+                    if (!spawnedMon.TestMobjLocation())
+                    {
+                        spawnedMon.Destroy();
+                    }
+                    else
+                    {
+                        spawnedMon.A_SpawnItemEx("TeleportFog");
+                        spawnedMon.GiveInventory("AdaptiveSpawnToken", 1);
+                    }
                 }
                 respawnQueue.Delete(i);
             }
@@ -289,6 +370,8 @@ class AdaptiveDifficultyHandler : StaticEventHandler
 
     ui string GetDifficultyRankName()
     {
+        if (currentDifficulty >= 10.0) return "ARMAGEDDON";
+        if (currentDifficulty >= 5.0) return "SLAUGHTERFEST";
         if (currentDifficulty >= 2.0) return "NIGHTMARE";
         if (currentDifficulty >= 1.5) return "ULTRA-VIOLENCE";
         if (currentDifficulty >= 1.0) return "HURT ME PLENTY";
@@ -298,6 +381,8 @@ class AdaptiveDifficultyHandler : StaticEventHandler
 
     override void RenderOverlay(RenderEvent e)
     {
+        if (!IsEngineActive()) return; 
+        
         CVar showCv = CVar.FindCVar('adaptive_hud_show');
         if (showCv && !showCv.GetBool()) return;
         if (automapactive || !playeringame[consoleplayer]) return;
@@ -308,20 +393,21 @@ class AdaptiveDifficultyHandler : StaticEventHandler
         CVar xCv = CVar.FindCVar('adaptive_hud_x');
         CVar yCv = CVar.FindCVar('adaptive_hud_y');
         CVar scaleCv = CVar.FindCVar('adaptive_hud_scale');
-
+        
         int posX = xCv ? xCv.GetInt() : 25;
         int posY = yCv ? yCv.GetInt() : 25;
         float hudScale = scaleCv ? scaleCv.GetFloat() : 1.0;
 
         int uiColor = Font.CR_GREEN;
-        if (currentDifficulty >= 1.7)       uiColor = Font.CR_RED;
+        if (currentDifficulty >= 5.0)       uiColor = Font.CR_FIRE;
+        else if (currentDifficulty >= 2.5)  uiColor = Font.CR_PURPLE;
+        else if (currentDifficulty >= 1.7)  uiColor = Font.CR_RED;
         else if (currentDifficulty >= 1.3)  uiColor = Font.CR_GOLD;
         else if (currentDifficulty < 0.8)   uiColor = Font.CR_LIGHTBLUE;
-
+        
         string rankTitle = GetDifficultyRankName();
         string diffLine = String.Format("STRESS PROFILE: %s (%.2f)", rankTitle, currentDifficulty);
         string killLine = String.Format("CAMPAIGN ELIMINATIONS: %d", totalMonstersKilledThisSession);
-
         int lineSpacing = int(22 * hudScale);
 
         Screen.DrawText("BigFont", uiColor, posX, posY, diffLine, 
@@ -329,7 +415,7 @@ class AdaptiveDifficultyHandler : StaticEventHandler
             
         Screen.DrawText("SmallFont", Font.CR_GREY, posX, posY + lineSpacing, killLine, 
             DTA_KeepRatio, true, DTA_ScaleX, hudScale, DTA_ScaleY, hudScale);
-
+            
         CVar ammoProtCv = CVar.FindCVar('adaptive_ammo_protection');
         CVar aggChainsCv = CVar.FindCVar('adaptive_aggression_chains');
 
