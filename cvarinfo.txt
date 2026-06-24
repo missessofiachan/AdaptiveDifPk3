@@ -1,0 +1,26 @@
+// Core Engine Multipliers & Tracking
+server bool adaptive_allow_respawn = true;
+server bool adaptive_health_mult = true;
+server bool adaptive_speed_mult = true;
+server float adaptive_ramp_up_speed = 0.03;
+server float adaptive_cool_down_speed = 0.05;
+server float adaptive_max_difficulty = 2.0; 
+server float adaptive_min_difficulty = 0.5;
+
+// Advanced Features & Mechanics Configuration
+server int adaptive_active_preset = 3;       
+server bool adaptive_aggressive_tracking = false; 
+server float adaptive_respawn_intensity = 1.0;  
+server int adaptive_respawn_floor_pct = 40;     
+
+// Dynamic Spawn Multiplier System
+server bool adaptive_allow_extra_spawns = true;
+server float adaptive_spawn_chance_mult = 25.0; 
+server bool adaptive_ammo_protection = true;   
+server bool adaptive_aggression_chains = true; 
+
+// HUD Layout Positioning Settings
+user bool adaptive_hud_show = true;
+user int adaptive_hud_x = 25;
+user int adaptive_hud_y = 25;
+user float adaptive_hud_scale = 1.0;

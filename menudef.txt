@@ -1,0 +1,52 @@
+OptionMenu "AdaptiveDifficultyMenu"
+{
+    Title "Adaptive Difficulty Engine Config"
+    
+    StaticText "--- Difficulty Preset Profiles ---"
+    Option "Active Engine Preset", "adaptive_active_preset", "AdaptivePresets"
+    
+    StaticText " "
+    StaticText "--- Core Engine Drivers ---"
+    Option "Enable Reactive Respawns", "adaptive_allow_respawn", "OnOff"
+    Option "Scale Monster Health", "adaptive_health_mult", "OnOff"
+    Option "Scale Monster Speed", "adaptive_speed_mult", "OnOff"
+    Slider "Difficulty Maximum Cap", "adaptive_max_difficulty", 0.5, 2.0, 0.1, 1
+    Slider "Difficulty Minimum Floor", "adaptive_min_difficulty", 0.1, 1.5, 0.1, 1
+    Slider "Aggression Ramp-Up Speed", "adaptive_ramp_up_speed", 0.01, 0.20, 0.01, 2
+    Slider "Recovery Cool-Down Speed", "adaptive_cool_down_speed", 0.01, 0.20, 0.01, 2
+    
+    StaticText " "
+    StaticText "--- Map Generation Density ---"
+    Option "Enable Spawn Multiplier", "adaptive_allow_extra_spawns", "OnOff"
+    Slider "Duplication Ratio (%) [100% = 1x Extra]", "adaptive_spawn_chance_mult", 0.0, 1000.0, 25.0, 0
+    Option "Halt Multipliers on Low Ammo", "adaptive_ammo_protection", "OnOff"
+    Option "Boost Multipliers on Kill Chains", "adaptive_aggression_chains", "OnOff"
+    
+    StaticText " "
+    StaticText "--- Advanced System Tuners ---"
+    Option "Use Aggressive Tracking Curve", "adaptive_aggressive_tracking", "OnOff"
+    Slider "Respawn Velocity Multiplier", "adaptive_respawn_intensity", 0.5, 3.0, 0.1, 1
+    Slider "Respawn Player Health Floor (%)", "adaptive_respawn_floor_pct", 0, 100, 5, 0
+    
+    StaticText " "
+    StaticText "--- HUD Visual Adjustments ---"
+    Option "Display Difficulty Status Display", "adaptive_hud_show", "OnOff"
+    Slider "Screen X Coordinate Position", "adaptive_hud_x", 0, 1920, 5, 0
+    Slider "Screen Y Coordinate Position", "adaptive_hud_y", 0, 1080, 5, 0
+    Slider "Text Interface Scale Size", "adaptive_hud_scale", 0.5, 2.5, 0.1, 1
+}
+
+OptionString "AdaptivePresets"
+{
+    0, "I'm Too Young To Die (0.5x Baseline)"
+    1, "Hey, Not Too Rough (0.8x Baseline)"
+    2, "Hurt Me Plenty (1.0x Baseline)"
+    3, "Ultra-Violence (1.3x Adaptive Scaling)"
+    4, "Adaptive Nightmare (Dynamic 1.0x - 2.0x)"
+    5, "Absolute Pandemonium (Static 2.0x Nightmare Cap)"
+}
+
+AddOptionMenu "OptionsMenu"
+{
+    Submenu "Adaptive Difficulty Options", "AdaptiveDifficultyMenu"
+}
