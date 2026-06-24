@@ -72,11 +72,20 @@ OptionMenu "AdaptiveSpawnMenu"
 {
     Title "Map Density & Generation"
     
-    Option "Enable Spawn Multiplier", "adaptive_allow_extra_spawns", "OnOff"
-    Tooltip "Allows the engine to clone and duplicate monsters immediately when they spawn into the world."
+    Option "Global Spawn Multiplier Master", "adaptive_allow_extra_spawns", "OnOff"
+    Tooltip "Enables or disables all enemy duplication routines across the engine globally."
+    
+    StaticText "--- Granular Target Routing ---"
+    Option "Clone Base Map Spawns", "adaptive_clone_base_spawns", "OnOff"
+    Tooltip "Allows the duplication system to copy enemies that spawn natively with the level or via map script triggers."
+    Option "Clone Reactive Respawn Spawns", "adaptive_clone_respawn_spawns", "OnOff"
+    Tooltip "Allows the duplication engine to multiply monsters when they materialize via the internal death respawn loop."
+    
+    StaticText " "
+    StaticText "--- Calibration Sliders ---"
     Option "Scale Multiplier in Real-Time", "adaptive_spawn_realtime", "OnOff"
     Tooltip "When enabled, spawn cloning rates scale exponentially with your active difficulty rating."
-    Slider "Duplication Ratio (%)", "adaptive_spawn_chance_mult", 0.0, 10000.0, 25.0, 0
+    Slider "Duplication Ratio (%)", "adaptive_spawn_chance_mult", 0.0, 50000.0, 50.0, 0 // Threshold expanded for near-infinity loads
     Tooltip "Base chance percentage for duplicating enemies. 100% guarantees at least one clone."
     Slider "Max Enemy Cloning Distance", "adaptive_spawn_max_range", 256.0, 8192.0, 128.0, 0
     Tooltip "Monsters further away from the player than this threshold will not generate clones, saving performance."

@@ -216,6 +216,74 @@ class AdaptiveDifficultyHandler : StaticEventHandler
         if (itemRecycleCv && itemRecycleCv.GetBool()) ProcessItemRecycleQueue();
     }
 
+    // Unified helper core logic for uncapped multiplication scaling routines
+    void ExecuteCloningCore(Actor mon, bool bIsARespawn)
+    {
+        CVar extraSpawnsCv = CVar.FindCVar('adaptive_allow_extra_spawns');
+        if (!extraSpawnsCv || !extraSpawnsCv.GetBool()) return;
+
+        // Route structural evaluations strictly against specific preference sliders
+        CVar baseToggle = CVar.FindCVar('adaptive_clone_base_spawns');
+        CVar respawnToggle = CVar.FindCVar('adaptive_clone_respawn_spawns');
+        
+        if (!bIsARespawn && baseToggle && !baseToggle.GetBool()) return;
+        if (bIsARespawn && respawnToggle && !respawnToggle.GetBool()) return;
+
+        PlayerInfo p = players[consoleplayer];
+        if (p && p.mo)
+        {
+            CVar maxSpRangeCv = CVar.FindCVar('adaptive_spawn_max_range');
+            double maxSpRange = maxSpRangeCv ? maxSpRangeCv.GetFloat() : 2048.0;
+            if ((mon.pos - p.mo.pos).Length() > maxSpRange) return;
+        }
+
+        CVar ammoProtCv = CVar.FindCVar('adaptive_ammo_protection');
+        if (ammoProtCv && ammoProtCv.GetBool() && isAmmoStarved) return;
+
+        mon.GiveInventory("AdaptiveSpawnToken", 1);
+        
+        CVar chanceCv = CVar.FindCVar('adaptive_spawn_chance_mult');
+        double baseChance = chanceCv ? chanceCv.GetFloat() : 25.0;
+        
+        double scaledProbability = baseChance;
+        CVar realTimeCv = CVar.FindCVar('adaptive_spawn_realtime');
+        if (realTimeCv && realTimeCv.GetBool())
+        {
+            scaledProbability = baseChance * currentDifficulty;
+        }
+        
+        CVar aggChainsCv = CVar.FindCVar('adaptive_aggression_chains');
+        if (aggChainsCv && aggChainsCv.GetBool() && killChainCounter >= 8) 
+        {
+            scaledProbability *= 1.5;
+        }
+
+        int clonesToSpawn = int(scaledProbability / 100.0);
+        double remainderChance = scaledProbability % 100.0;
+        
+        if (FRandom[AdaptiveSpawnGen](0.0, 100.0) <= remainderChance) clonesToSpawn++;
+        clonesToSpawn = Min(clonesToSpawn, 150); // Hard protection cap expanded to safely prevent stack overflows
+
+        for (int i = 0; i < clonesToSpawn; i++)
+        {
+            Vector3 spawnPos = mon.pos + (FRandom[AdaptiveOffset](-96, 96), FRandom[AdaptiveOffset](-96, 96), 0);
+            Actor clone = Actor.Spawn(mon.GetClass(), spawnPos, ALLOW_REPLACE);
+            
+            if (clone)
+            {
+                if (!clone.TestMobjLocation()) 
+                {
+                    clone.Destroy();
+                }
+                else
+                {
+                    clone.GiveInventory("AdaptiveSpawnToken", 1);
+                    clone.bAMBUSH = mon.bAMBUSH;
+                }
+            }
+        }
+    }
+
     override void WorldThingSpawned(WorldEvent e)
     {
         if (!IsEngineActive()) return;
@@ -286,63 +354,8 @@ class AdaptiveDifficultyHandler : StaticEventHandler
             mon.ReactionTime = Max(0, int(mon.default.ReactionTime / currentDifficulty));
         }
 
-        CVar extraSpawnsCv = CVar.FindCVar('adaptive_allow_extra_spawns');
-        if (extraSpawnsCv && extraSpawnsCv.GetBool())
-        {
-            PlayerInfo p = players[consoleplayer];
-            if (p && p.mo)
-            {
-                CVar maxSpRangeCv = CVar.FindCVar('adaptive_spawn_max_range');
-                double maxSpRange = maxSpRangeCv ? maxSpRangeCv.GetFloat() : 2048.0;
-                if ((mon.pos - p.mo.pos).Length() > maxSpRange) return;
-            }
-
-            CVar ammoProtCv = CVar.FindCVar('adaptive_ammo_protection');
-            if (ammoProtCv && ammoProtCv.GetBool() && isAmmoStarved) return;
-
-            mon.GiveInventory("AdaptiveSpawnToken", 1);
-            
-            CVar chanceCv = CVar.FindCVar('adaptive_spawn_chance_mult');
-            double baseChance = chanceCv ? chanceCv.GetFloat() : 25.0;
-            
-            double scaledProbability = baseChance;
-            CVar realTimeCv = CVar.FindCVar('adaptive_spawn_realtime');
-            if (realTimeCv && realTimeCv.GetBool())
-            {
-                scaledProbability = baseChance * currentDifficulty;
-            }
-            
-            CVar aggChainsCv = CVar.FindCVar('adaptive_aggression_chains');
-            if (aggChainsCv && aggChainsCv.GetBool() && killChainCounter >= 8) 
-            {
-                scaledProbability *= 1.5;
-            }
-
-            int clonesToSpawn = int(scaledProbability / 100.0);
-            double remainderChance = scaledProbability % 100.0;
-            
-            if (FRandom[AdaptiveSpawnGen](0.0, 100.0) <= remainderChance) clonesToSpawn++;
-            clonesToSpawn = Min(clonesToSpawn, 50);
-
-            for (int i = 0; i < clonesToSpawn; i++)
-            {
-                Vector3 spawnPos = mon.pos + (FRandom[AdaptiveOffset](-64, 64), FRandom[AdaptiveOffset](-64, 64), 0);
-                Actor clone = Actor.Spawn(mon.GetClass(), spawnPos, ALLOW_REPLACE);
-                
-                if (clone)
-                {
-                    if (!clone.TestMobjLocation()) 
-                    {
-                        clone.Destroy();
-                    }
-                    else
-                    {
-                        clone.GiveInventory("AdaptiveSpawnToken", 1);
-                        clone.bAMBUSH = mon.bAMBUSH;
-                    }
-                }
-            }
-        }
+        // Fresh Level Spawn Intercept (Passed as false since it is a raw map load)
+        ExecuteCloningCore(mon, false);
     }
 
     override void WorldThingDestroyed(WorldEvent e)
@@ -485,7 +498,9 @@ class AdaptiveDifficultyHandler : StaticEventHandler
                     else
                     {
                         spawnedMon.A_SpawnItemEx("TeleportFog");
-                        spawnedMon.GiveInventory("AdaptiveSpawnToken", 1);
+                        
+                        // Execute Uncapped Clone Multiplier Matrix explicitly marking it as a Respawn instance (true)
+                        ExecuteCloningCore(spawnedMon, true);
                     }
                 }
                 respawnQueue.Delete(i);

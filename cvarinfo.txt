@@ -4,14 +4,18 @@ server bool adaptive_engine_enabled = true;
 // Core Engine Real-Time Multiplier Toggles
 server bool adaptive_health_mult = true;
 server bool adaptive_speed_mult = true;
-server bool adaptive_damage_mult = true; // NEW: Granular master toggle for real-time damage adaptations
+server bool adaptive_damage_mult = true;
 server bool adaptive_allow_respawn = true;
+
+// NEW: Infinite Scaling Clone Selection Matrix
+server bool adaptive_clone_base_spawns = true;   // Allows cloning on fresh map loads / script spawns
+server bool adaptive_clone_respawn_spawns = true; // NEW: Allows cloning specifically when monsters respawn
 
 // Core Sliders (Dynamic Evaluation)
 server float adaptive_ramp_up_speed = 0.03;
 server float adaptive_cool_down_speed = 0.05;
-server float adaptive_max_difficulty = 2.0; 
-server float adaptive_min_difficulty = 0.5;
+server float adaptive_max_difficulty = 50.0;     // Boosted significantly for high-scaling sandbox play
+server float adaptive_min_difficulty = 0.1;
 
 // Advanced Features & Mechanics Configuration
 server int adaptive_active_preset = 3;       
@@ -19,7 +23,7 @@ server bool adaptive_aggressive_tracking = false;
 server float adaptive_respawn_intensity = 1.0;
 server int adaptive_respawn_floor_pct = 40;     
 
-// Dynamic Spawn Multiplier System
+// Dynamic Spawn Multiplier System (Uncapped Options)
 server bool adaptive_allow_extra_spawns = true;
 server float adaptive_spawn_chance_mult = 25.0;
 server bool adaptive_spawn_realtime = true;     
