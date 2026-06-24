@@ -7,9 +7,9 @@ OptionMenu "AdaptiveDifficultyMenu"
     Tooltip "Completely turn the dynamic Director AI on or off globally mid-game."
     
     StaticText " "
-    StaticText "--- Difficulty Preset Profiles ---"
+    StaticText "--- Profile Selector (Updates Sliders Below) ---"
     Option "Active Engine Preset", "adaptive_active_preset", "AdaptivePresets"
-    Tooltip "Choose a curated difficulty profile, or select Custom to unlock manual slider tuning."
+    Tooltip "Selecting a profile immediately reconfigured all variables below to match its baseline."
     
     StaticText " "
     StaticText "--- Core Engine Drivers ---"
@@ -29,13 +29,17 @@ OptionMenu "AdaptiveDifficultyMenu"
     Tooltip "How fast the game calms down and softens difficulty when your health drops below 35%."
     
     StaticText " "
-    StaticText "--- Map Generation Density ---"
+    StaticText "--- Map Generation & Scaling Ranges ---"
     Option "Enable Spawn Multiplier", "adaptive_allow_extra_spawns", "OnOff"
     Tooltip "Allows the engine to clone and duplicate monsters immediately when they spawn into the world."
     Option "Scale Multiplier in Real-Time", "adaptive_spawn_realtime", "OnOff"
     Tooltip "When enabled, spawn cloning rates scale exponentially with your active difficulty rating."
-    Slider "Duplication Ratio (%) [100% = 1x Extra]", "adaptive_spawn_chance_mult", 0.0, 10000.0, 25.0, 0
+    Slider "Duplication Ratio (%)", "adaptive_spawn_chance_mult", 0.0, 10000.0, 25.0, 0
     Tooltip "Base chance percentage for duplicating enemies. 100% guarantees at least one clone."
+    Slider "Max Enemy Cloning Distance", "adaptive_spawn_max_range", 256.0, 8192.0, 128.0, 0
+    Tooltip "Monsters further away from the player than this threshold will not generate clones, saving performance."
+    Slider "Min Enemy Respawn Safety Distance", "adaptive_respawn_min_range", 0.0, 4096.0, 64.0, 0
+    Tooltip "Prevents dead monsters from respawning if they are too close to your back. Keeps encounters clean."
     Option "Halt Multipliers on Low Ammo", "adaptive_ammo_protection", "OnOff"
     Tooltip "Automatically freezes monster clone features if your overall ammunition reserves drop below 15%."
     Option "Boost Multipliers on Kill Chains", "adaptive_aggression_chains", "OnOff"
@@ -49,7 +53,7 @@ OptionMenu "AdaptiveDifficultyMenu"
     Tooltip "Reduces cross-monster infighting damage at high difficulties so hordes don't kill themselves."
     Option "Use Aggressive Tracking Curve", "adaptive_aggressive_tracking", "OnOff"
     Tooltip "Doubles the speed at which the difficulty rating shifts up or down."
-    Option "Dynamic Pain Resistance (Unstaggerable)", "adaptive_ai_pain_resist", "OnOff"
+    Option "Dynamic Pain Resistance", "adaptive_ai_pain_resist", "OnOff"
     Tooltip "Reduces enemy stagger rates linearly as difficulty climbs, making them harder to lock down."
     Option "Hair-Trigger Target Reflexes", "adaptive_ai_reflexes", "OnOff"
     Tooltip "Cuts down enemy targeting reaction delays, causing them to attack the millisecond they see you."
@@ -61,17 +65,25 @@ OptionMenu "AdaptiveDifficultyMenu"
     Tooltip "Higher numbers cause re-queued monsters to respawn drastically faster."
     Slider "Respawn Player Health Floor (%)", "adaptive_respawn_floor_pct", 0, 100, 5, 0
     Tooltip "Completely pauses monster respawning mechanics if your player health drops below this threshold."
+
+    StaticText " "
+    StaticText "--- Dynamic Item Respawn Systems ---"
+    Option "Enable Dynamic Item Recycling", "adaptive_item_respawn", "OnOff"
+    Tooltip "Enables item respawning. Tracks items collected from the map grid and queues them to reappear."
+    Slider "Item Respawn Delay (Seconds)", "adaptive_item_respawn_time", 5.0, 300.0, 5.0, 0
+    Tooltip "How long it takes for a gathered piece of health, armor, or ammunition to reappear on its spawn pad."
+    Option "Allow Heavy Weapons to Respawn", "adaptive_item_respawn_weapons", "OnOff"
+    Tooltip "If disabled, weapons are treated as single-pickup items, while health and ammo continue recycling."
+    Option "Anti-Camp Proximity Safety", "adaptive_item_respawn_proximity_check", "OnOff"
+    Tooltip "If enabled, items wait for you to step away before popping in. If disabled, they spawn directly on you."
     
     StaticText " "
     StaticText "--- HUD Visual Adjustments ---"
     Option "Display Difficulty Status Display", "adaptive_hud_show", "OnOff"
     Tooltip "Toggles the real-time Stress Profile performance tracker on your screen."
     Slider "Screen X Coordinate Position", "adaptive_hud_x", 0, 1920, 5, 0
-    Tooltip "Horizontal positioning of the engine HUD."
     Slider "Screen Y Coordinate Position", "adaptive_hud_y", 0, 1080, 5, 0
-    Tooltip "Vertical positioning of the engine HUD."
     Slider "Text Interface Scale Size", "adaptive_hud_scale", 0.5, 2.5, 0.1, 1
-    Tooltip "Adjusts the text size of the dynamic difficulty overlay."
 }
 
 OptionString "AdaptivePresets"
@@ -82,7 +94,10 @@ OptionString "AdaptivePresets"
     3, "Ultra-Violence (1.3x Adaptive Scaling)"
     4, "Adaptive Nightmare (Dynamic 1.0x - 2.0x)"
     5, "Absolute Pandemonium (Static 2.0x Nightmare Cap)"
-    6, "Custom / Unrestricted Sandbox"
+    6, "Turbo Overdrive (Ultra Speed, Hair Reflexes, Low Enemy HP)"
+    7, "Meat Grinder (Massive Enemy Spawns, Extreme HP, Slow Speeds)"
+    8, "Bullet Hell (Extreme Overclocked Projectiles, Absolute Chaos)"
+    9, "Custom / Unrestricted Sandbox"
 }
 
 AddOptionMenu "OptionsMenu"

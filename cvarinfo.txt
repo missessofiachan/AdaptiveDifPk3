@@ -33,6 +33,16 @@ server bool adaptive_ai_reflexes = true;
 server bool adaptive_ai_projectiles = true;     
 server bool adaptive_enrage_swarm = true;       
 
+// Enemy Proximity & Range Settings
+server float adaptive_spawn_max_range = 2048.0;   
+server float adaptive_respawn_min_range = 512.0;  
+
+// Dynamic Item Respawn Configuration
+server bool adaptive_item_respawn = true;
+server float adaptive_item_respawn_time = 30.0;
+server bool adaptive_item_respawn_weapons = false;
+server bool adaptive_item_respawn_proximity_check = true; // NEW: The toggle to allow/prevent camping
+
 // HUD Layout Positioning Settings
 user bool adaptive_hud_show = true;
 user int adaptive_hud_x = 25;

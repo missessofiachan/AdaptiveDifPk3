@@ -7,6 +7,14 @@ class DynamicRespawnItem
     int respawnTimer;
 }
 
+class TrackedMapItem
+{
+    string className;
+    Vector3 spawnPos;
+    bool pickedUp;
+    int respawnTimer;
+}
+
 class AdaptiveSpawnToken : Inventory {}
 
 class AdaptiveDifficultyHandler : StaticEventHandler
@@ -19,8 +27,8 @@ class AdaptiveDifficultyHandler : StaticEventHandler
     int killChainCounter;
 
     Array<DynamicRespawnItem> respawnQueue;
+    Array<TrackedMapItem> mapItemRegistry;
 
-    // FIX: 'clearscope' allows both Play (world) and UI (HUD) to read this toggle safely.
     clearscope bool IsEngineActive()
     {
         CVar enableCv = CVar.FindCVar('adaptive_engine_enabled');
@@ -35,11 +43,13 @@ class AdaptiveDifficultyHandler : StaticEventHandler
         isAmmoStarved = false;
         killChainCounter = 0;
         respawnQueue.Clear();
+        mapItemRegistry.Clear();
     }
 
     override void WorldLoaded(WorldEvent e)
     {
         respawnQueue.Clear();
+        mapItemRegistry.Clear();
         ApplyPresetValues();
         killChainCounter = 0;
         if (IsEngineActive())
@@ -48,73 +58,84 @@ class AdaptiveDifficultyHandler : StaticEventHandler
         }
     }
 
+    void SetCVarBool(string name, bool val) { CVar cv = CVar.FindCVar(name); if(cv) cv.SetBool(val); }
+    void SetCVarFloat(string name, double val) { CVar cv = CVar.FindCVar(name); if(cv) cv.SetFloat(val); }
+    void SetCVarInt(string name, int val) { CVar cv = CVar.FindCVar(name); if(cv) cv.SetInt(val); }
+
     void ApplyPresetValues()
     {
         CVar presetCv = CVar.FindCVar('adaptive_active_preset');
         int selection = presetCv ? presetCv.GetInt() : 3;
         lastObservedPreset = selection;
 
-        if (selection == 6) return;
+        if (selection == 9) return; 
 
-        CVar respawnCv = CVar.FindCVar('adaptive_allow_respawn');
-        CVar extraCv = CVar.FindCVar('adaptive_allow_extra_spawns');
-        CVar chanceCv = CVar.FindCVar('adaptive_spawn_chance_mult');
-        CVar minCv = CVar.FindCVar('adaptive_min_difficulty');
-        CVar maxCv = CVar.FindCVar('adaptive_max_difficulty');
-        CVar realTimeCv = CVar.FindCVar('adaptive_spawn_realtime');
-        
         switch (selection)
         {
             case 0: 
-                if (respawnCv) respawnCv.SetBool(false);
-                if (extraCv) extraCv.SetBool(false);
-                if (minCv) minCv.SetFloat(0.3);
-                if (maxCv) maxCv.SetFloat(0.6);
-                if (realTimeCv) realTimeCv.SetBool(false);
-                currentDifficulty = 0.5;
-                break;
+                SetCVarBool('adaptive_allow_respawn', false); SetCVarBool('adaptive_health_mult', true); SetCVarBool('adaptive_speed_mult', true);
+                SetCVarFloat('adaptive_min_difficulty', 0.3); SetCVarFloat('adaptive_max_difficulty', 0.6); SetCVarFloat('adaptive_ramp_up_speed', 0.02); SetCVarFloat('adaptive_cool_down_speed', 0.08);
+                SetCVarBool('adaptive_allow_extra_spawns', false); SetCVarBool('adaptive_spawn_realtime', false); SetCVarFloat('adaptive_spawn_chance_mult', 0.0);
+                SetCVarBool('adaptive_nightmare_flags', false); SetCVarBool('adaptive_infight_mitigation', false); SetCVarBool('adaptive_aggressive_tracking', false);
+                SetCVarBool('adaptive_ai_pain_resist', false); SetCVarBool('adaptive_ai_reflexes', false); SetCVarBool('adaptive_ai_projectiles', false); SetCVarBool('adaptive_enrage_swarm', false);
+                currentDifficulty = 0.5; break;
             case 1: 
-                if (respawnCv) respawnCv.SetBool(false);
-                if (extraCv) extraCv.SetBool(false);
-                if (minCv) minCv.SetFloat(0.5);
-                if (maxCv) maxCv.SetFloat(0.9);
-                if (realTimeCv) realTimeCv.SetBool(false);
-                currentDifficulty = 0.8;
-                break;
+                SetCVarBool('adaptive_allow_respawn', false); SetCVarBool('adaptive_health_mult', true); SetCVarBool('adaptive_speed_mult', true);
+                SetCVarFloat('adaptive_min_difficulty', 0.5); SetCVarFloat('adaptive_max_difficulty', 0.9); SetCVarFloat('adaptive_ramp_up_speed', 0.03); SetCVarFloat('adaptive_cool_down_speed', 0.06);
+                SetCVarBool('adaptive_allow_extra_spawns', false); SetCVarBool('adaptive_spawn_realtime', false); SetCVarFloat('adaptive_spawn_chance_mult', 0.0);
+                SetCVarBool('adaptive_nightmare_flags', false); SetCVarBool('adaptive_infight_mitigation', false); SetCVarBool('adaptive_aggressive_tracking', false);
+                SetCVarBool('adaptive_ai_pain_resist', false); SetCVarBool('adaptive_ai_reflexes', false); SetCVarBool('adaptive_ai_projectiles', false); SetCVarBool('adaptive_enrage_swarm', false);
+                currentDifficulty = 0.8; break;
             case 2: 
-                if (respawnCv) respawnCv.SetBool(false);
-                if (extraCv) extraCv.SetBool(false);
-                if (minCv) minCv.SetFloat(0.8);
-                if (maxCv) maxCv.SetFloat(1.2);
-                if (realTimeCv) realTimeCv.SetBool(false);
-                currentDifficulty = 1.0;
-                break;
+                SetCVarBool('adaptive_allow_respawn', false); SetCVarBool('adaptive_health_mult', true); SetCVarBool('adaptive_speed_mult', true);
+                SetCVarFloat('adaptive_min_difficulty', 0.8); SetCVarFloat('adaptive_max_difficulty', 1.2); SetCVarFloat('adaptive_ramp_up_speed', 0.03); SetCVarFloat('adaptive_cool_down_speed', 0.05);
+                SetCVarBool('adaptive_allow_extra_spawns', false); SetCVarBool('adaptive_spawn_realtime', false); SetCVarFloat('adaptive_spawn_chance_mult', 0.0);
+                SetCVarBool('adaptive_nightmare_flags', false); SetCVarBool('adaptive_infight_mitigation', false); SetCVarBool('adaptive_aggressive_tracking', false);
+                SetCVarBool('adaptive_ai_pain_resist', false); SetCVarBool('adaptive_ai_reflexes', false); SetCVarBool('adaptive_ai_projectiles', false); SetCVarBool('adaptive_enrage_swarm', false);
+                currentDifficulty = 1.0; break;
             case 3: 
-                if (respawnCv) respawnCv.SetBool(false);
-                if (extraCv) extraCv.SetBool(true);
-                if (chanceCv) chanceCv.SetFloat(25.0);
-                if (minCv) minCv.SetFloat(1.0);
-                if (maxCv) maxCv.SetFloat(1.5);
-                if (realTimeCv) realTimeCv.SetBool(true);
-                currentDifficulty = 1.3;
-                break;
+                SetCVarBool('adaptive_allow_respawn', false); SetCVarBool('adaptive_health_mult', true); SetCVarBool('adaptive_speed_mult', true);
+                SetCVarFloat('adaptive_min_difficulty', 1.0); SetCVarFloat('adaptive_max_difficulty', 1.5); SetCVarFloat('adaptive_ramp_up_speed', 0.04); SetCVarFloat('adaptive_cool_down_speed', 0.04);
+                SetCVarBool('adaptive_allow_extra_spawns', true); SetCVarBool('adaptive_spawn_realtime', true); SetCVarFloat('adaptive_spawn_chance_mult', 25.0);
+                SetCVarBool('adaptive_nightmare_flags', true); SetCVarBool('adaptive_infight_mitigation', true); SetCVarBool('adaptive_aggressive_tracking', false);
+                SetCVarBool('adaptive_ai_pain_resist', true); SetCVarBool('adaptive_ai_reflexes', true); SetCVarBool('adaptive_ai_projectiles', false); SetCVarBool('adaptive_enrage_swarm', true);
+                currentDifficulty = 1.3; break;
             case 4: 
-                if (respawnCv) respawnCv.SetBool(true);
-                if (extraCv) extraCv.SetBool(true);
-                if (chanceCv) chanceCv.SetFloat(100.0);
-                if (minCv) minCv.SetFloat(1.0);
-                if (maxCv) maxCv.SetFloat(2.0); 
-                if (realTimeCv) realTimeCv.SetBool(true);
-                break;
+                SetCVarBool('adaptive_allow_respawn', true); SetCVarBool('adaptive_health_mult', true); SetCVarBool('adaptive_speed_mult', true);
+                SetCVarFloat('adaptive_min_difficulty', 1.0); SetCVarFloat('adaptive_max_difficulty', 2.5); SetCVarFloat('adaptive_ramp_up_speed', 0.05); SetCVarFloat('adaptive_cool_down_speed', 0.03);
+                SetCVarBool('adaptive_allow_extra_spawns', true); SetCVarBool('adaptive_spawn_realtime', true); SetCVarFloat('adaptive_spawn_chance_mult', 100.0);
+                SetCVarBool('adaptive_nightmare_flags', true); SetCVarBool('adaptive_infight_mitigation', true); SetCVarBool('adaptive_aggressive_tracking', true);
+                SetCVarBool('adaptive_ai_pain_resist', true); SetCVarBool('adaptive_ai_reflexes', true); SetCVarBool('adaptive_ai_projectiles', true); SetCVarBool('adaptive_enrage_swarm', true);
+                currentDifficulty = 1.5; break;
             case 5: 
-                if (respawnCv) respawnCv.SetBool(true);
-                if (extraCv) extraCv.SetBool(true);
-                if (chanceCv) chanceCv.SetFloat(300.0);
-                if (minCv) minCv.SetFloat(2.0);
-                if (maxCv) maxCv.SetFloat(2.0);
-                if (realTimeCv) realTimeCv.SetBool(false);
-                currentDifficulty = 2.0;
-                break;
+                SetCVarBool('adaptive_allow_respawn', true); SetCVarBool('adaptive_health_mult', true); SetCVarBool('adaptive_speed_mult', true);
+                SetCVarFloat('adaptive_min_difficulty', 2.0); SetCVarFloat('adaptive_max_difficulty', 4.0); SetCVarFloat('adaptive_ramp_up_speed', 0.08); SetCVarFloat('adaptive_cool_down_speed', 0.02);
+                SetCVarBool('adaptive_allow_extra_spawns', true); SetCVarBool('adaptive_spawn_realtime', true); SetCVarFloat('adaptive_spawn_chance_mult', 300.0);
+                SetCVarBool('adaptive_nightmare_flags', true); SetCVarBool('adaptive_infight_mitigation', true); SetCVarBool('adaptive_aggressive_tracking', true);
+                SetCVarBool('adaptive_ai_pain_resist', true); SetCVarBool('adaptive_ai_reflexes', true); SetCVarBool('adaptive_ai_projectiles', true); SetCVarBool('adaptive_enrage_swarm', true);
+                currentDifficulty = 2.0; break;
+            case 6: 
+                SetCVarBool('adaptive_allow_respawn', true); SetCVarBool('adaptive_health_mult', true); SetCVarBool('adaptive_speed_mult', true);
+                SetCVarFloat('adaptive_min_difficulty', 0.8); SetCVarFloat('adaptive_max_difficulty', 2.5); SetCVarFloat('adaptive_ramp_up_speed', 0.10); SetCVarFloat('adaptive_cool_down_speed', 0.05);
+                SetCVarBool('adaptive_allow_extra_spawns', false); SetCVarBool('adaptive_spawn_realtime', false); SetCVarFloat('adaptive_spawn_chance_mult', 0.0);
+                SetCVarBool('adaptive_nightmare_flags', true); SetCVarBool('adaptive_infight_mitigation', true); SetCVarBool('adaptive_aggressive_tracking', true);
+                SetCVarBool('adaptive_ai_pain_resist', false); SetCVarBool('adaptive_ai_reflexes', true); SetCVarBool('adaptive_ai_projectiles', true); SetCVarBool('adaptive_enrage_swarm', true);
+                SetCVarFloat('adaptive_max_difficulty', 1.2); 
+                currentDifficulty = 1.0; break;
+            case 7: 
+                SetCVarBool('adaptive_allow_respawn', true); SetCVarBool('adaptive_health_mult', true); SetCVarBool('adaptive_speed_mult', false);
+                SetCVarFloat('adaptive_min_difficulty', 1.5); SetCVarFloat('adaptive_max_difficulty', 6.0); SetCVarFloat('adaptive_ramp_up_speed', 0.05); SetCVarFloat('adaptive_cool_down_speed', 0.02);
+                SetCVarBool('adaptive_allow_extra_spawns', true); SetCVarBool('adaptive_spawn_realtime', true); SetCVarFloat('adaptive_spawn_chance_mult', 400.0);
+                SetCVarBool('adaptive_nightmare_flags', false); SetCVarBool('adaptive_infight_mitigation', true); SetCVarBool('adaptive_aggressive_tracking', false);
+                SetCVarBool('adaptive_ai_pain_resist', true); SetCVarBool('adaptive_ai_reflexes', false); SetCVarBool('adaptive_ai_projectiles', false); SetCVarBool('adaptive_enrage_swarm', false);
+                currentDifficulty = 2.0; break;
+            case 8: 
+                SetCVarBool('adaptive_allow_respawn', false); SetCVarBool('adaptive_health_mult', false); SetCVarBool('adaptive_speed_mult', true);
+                SetCVarFloat('adaptive_min_difficulty', 1.0); SetCVarFloat('adaptive_max_difficulty', 3.5); SetCVarFloat('adaptive_ramp_up_speed', 0.12); SetCVarFloat('adaptive_cool_down_speed', 0.06);
+                SetCVarBool('adaptive_allow_extra_spawns', true); SetCVarBool('adaptive_spawn_realtime', true); SetCVarFloat('adaptive_spawn_chance_mult', 150.0);
+                SetCVarBool('adaptive_nightmare_flags', true); SetCVarBool('adaptive_infight_mitigation', true); SetCVarBool('adaptive_aggressive_tracking', true);
+                SetCVarBool('adaptive_ai_pain_resist', true); SetCVarBool('adaptive_ai_reflexes', true); SetCVarBool('adaptive_ai_projectiles', true); SetCVarBool('adaptive_enrage_swarm', true);
+                currentDifficulty = 1.5; break;
         }
     }
 
@@ -176,6 +197,9 @@ class AdaptiveDifficultyHandler : StaticEventHandler
 
         CVar allowRespawnCv = CVar.FindCVar('adaptive_allow_respawn');
         if (allowRespawnCv && allowRespawnCv.GetBool()) ProcessRespawnQueue(p.mo.health);
+
+        CVar itemRecycleCv = CVar.FindCVar('adaptive_item_respawn');
+        if (itemRecycleCv && itemRecycleCv.GetBool()) ProcessItemRecycleQueue();
     }
 
     override void WorldThingSpawned(WorldEvent e)
@@ -189,6 +213,31 @@ class AdaptiveDifficultyHandler : StaticEventHandler
             {
                 e.Thing.Speed = e.Thing.default.Speed * currentDifficulty;
                 e.Thing.Vel *= currentDifficulty; 
+            }
+            return;
+        }
+
+        let mapItem = Inventory(e.Thing);
+        if (mapItem && !mapItem.Owner && !mapItem.bISMONSTER && !mapItem.player)
+        {
+            bool itemKnown = false;
+            for (int i = 0; i < mapItemRegistry.Size(); i++)
+            {
+                if (mapItemRegistry[i].spawnPos == mapItem.pos && mapItemRegistry[i].className == mapItem.GetClassName())
+                {
+                    itemKnown = true;
+                    mapItemRegistry[i].pickedUp = false; 
+                    break;
+                }
+            }
+            if (!itemKnown)
+            {
+                let regRecord = new("TrackedMapItem");
+                regRecord.className = mapItem.GetClassName();
+                regRecord.spawnPos = mapItem.pos;
+                regRecord.pickedUp = false;
+                regRecord.respawnTimer = 0;
+                mapItemRegistry.Push(regRecord);
             }
             return;
         }
@@ -227,6 +276,14 @@ class AdaptiveDifficultyHandler : StaticEventHandler
         CVar extraSpawnsCv = CVar.FindCVar('adaptive_allow_extra_spawns');
         if (extraSpawnsCv && extraSpawnsCv.GetBool())
         {
+            PlayerInfo p = players[consoleplayer];
+            if (p && p.mo)
+            {
+                CVar maxSpRangeCv = CVar.FindCVar('adaptive_spawn_max_range');
+                double maxSpRange = maxSpRangeCv ? maxSpRangeCv.GetFloat() : 2048.0;
+                if ((mon.pos - p.mo.pos).Length() > maxSpRange) return; 
+            }
+
             CVar ammoProtCv = CVar.FindCVar('adaptive_ammo_protection');
             if (ammoProtCv && ammoProtCv.GetBool() && isAmmoStarved) return;
 
@@ -269,6 +326,40 @@ class AdaptiveDifficultyHandler : StaticEventHandler
                     {
                         clone.GiveInventory("AdaptiveSpawnToken", 1);
                         clone.bAMBUSH = mon.bAMBUSH;
+                    }
+                }
+            }
+        }
+    }
+
+    override void WorldThingDestroyed(WorldEvent e)
+    {
+        if (!IsEngineActive()) return;
+
+        let itemRef = Inventory(e.Thing);
+        if (itemRef && !itemRef.Owner)
+        {
+            CVar recCv = CVar.FindCVar('adaptive_item_respawn');
+            if (recCv && recCv.GetBool())
+            {
+                if (Weapon(itemRef)) 
+                {
+                    CVar wpCv = CVar.FindCVar('adaptive_item_respawn_weapons');
+                    if (!wpCv || !wpCv.GetBool()) return;
+                }
+
+                for (int i = 0; i < mapItemRegistry.Size(); i++)
+                {
+                    if (!mapItemRegistry[i].pickedUp && mapItemRegistry[i].spawnPos == itemRef.pos && mapItemRegistry[i].className == itemRef.GetClassName())
+                    {
+                        mapItemRegistry[i].pickedUp = true;
+                        CVar timeCv = CVar.FindCVar('adaptive_item_respawn_time');
+                        double sDelay = timeCv ? timeCv.GetFloat() : 30.0;
+                        
+                        sDelay *= currentDifficulty; 
+                        
+                        mapItemRegistry[i].respawnTimer = int(35 * Max(1.0, sDelay));
+                        break;
                     }
                 }
             }
@@ -339,6 +430,12 @@ class AdaptiveDifficultyHandler : StaticEventHandler
         int floorPct = floorCv ? floorCv.GetInt() : 40;
         if (playerHealth < floorPct) return;
         
+        PlayerInfo p = players[consoleplayer];
+        Vector3 pPos = (p && p.mo) ? p.mo.pos : (0, 0, 0);
+
+        CVar minRangeCv = CVar.FindCVar('adaptive_respawn_min_range');
+        double minRange = minRangeCv ? minRangeCv.GetFloat() : 512.0;
+
         for (int i = respawnQueue.Size() - 1; i >= 0; i--)
         {
             if (respawnQueue[i] == null)
@@ -346,6 +443,13 @@ class AdaptiveDifficultyHandler : StaticEventHandler
                 respawnQueue.Delete(i);
                 continue;
             }
+
+            if (p && p.mo)
+            {
+                double playerDist = (respawnQueue[i].spawnPos - pPos).Length();
+                if (playerDist < minRange) continue; 
+            }
+
             respawnQueue[i].respawnTimer--;
             
             if (respawnQueue[i].respawnTimer <= 0)
@@ -364,6 +468,40 @@ class AdaptiveDifficultyHandler : StaticEventHandler
                     }
                 }
                 respawnQueue.Delete(i);
+            }
+        }
+    }
+
+    void ProcessItemRecycleQueue()
+    {
+        PlayerInfo p = players[consoleplayer];
+        Vector3 pPos = (p && p.mo) ? p.mo.pos : (0, 0, 0);
+
+        // Fetch user's anti-camp preference
+        CVar proxCv = CVar.FindCVar('adaptive_item_respawn_proximity_check');
+        bool doProxCheck = proxCv ? proxCv.GetBool() : true;
+
+        for (int i = 0; i < mapItemRegistry.Size(); i++)
+        {
+            if (mapItemRegistry[i].pickedUp)
+            {
+                // Distance Check for items (only runs if the toggle is set to TRUE)
+                if (doProxCheck && p && p.mo)
+                {
+                    double playerDist = (mapItemRegistry[i].spawnPos - pPos).Length();
+                    if (playerDist < 128.0) continue; // Pauses timer until the player moves away
+                }
+
+                mapItemRegistry[i].respawnTimer--;
+                if (mapItemRegistry[i].respawnTimer <= 0)
+                {
+                    Actor drop = Actor.Spawn(mapItemRegistry[i].className, mapItemRegistry[i].spawnPos, ALLOW_REPLACE);
+                    if (drop)
+                    {
+                        drop.A_SpawnItemEx("ItemFog");
+                    }
+                    mapItemRegistry[i].pickedUp = false; 
+                }
             }
         }
     }
